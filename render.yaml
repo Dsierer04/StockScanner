@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: stock-scanner
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python stock_scanner.py
+    plan: free
