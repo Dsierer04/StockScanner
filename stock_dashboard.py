@@ -1,13 +1,11 @@
 print("\n🚨 IF YOU SEE THIS, PLAYWRIGHT SCRIPT IS RUNNING 🚨\n")
 import os
-print(f"\n✅ RUNNING SCRIPT FROM: {os.path.abspath(__file__)}\n")
-import os
 import time
 import threading
 import datetime
 import csv
-from collections import deque, Counter
-from flask import Flask, render_template_string, jsonify
+from collections import deque
+from flask import Flask, render_template_string
 from playwright.sync_api import sync_playwright
 import praw
 
@@ -22,8 +20,7 @@ TICKERS = [
     "QQQ","UVXY","TQQQ","LCID","RBLX","ETH","BTC"
 ]
 KEYWORDS = ["moon", "halt", "runner", "squeeze", "earnings", "guidance", "news", "breakout", "low float"]
-CHECK_INTERVAL = 60
-TRENDING_INTERVAL = 600
+CHECK_INTERVAL = 60  # 1 min scrape interval
 CSV_FILE = "mentions.csv"
 
 # ===== Reddit API Credentials =====
@@ -32,8 +29,6 @@ reddit = praw.Reddit(
     client_secret="jQFcCe3DlD62ESnYgudK6IAsat_RPw",
     user_agent="StockPumpScanner"
 )
-mentions = deque(maxlen=500)
-recent_mentions = deque()
 
 # ===== CSV Setup =====
 if not os.path.exists(CSV_FILE):
@@ -41,7 +36,7 @@ if not os.path.exists(CSV_FILE):
         writer = csv.writer(f)
         writer.writerow(["Time", "Source", "Ticker", "Text"])
 
-# ===== Twitter Scraper (Playwright) =====
+# ===== Twitter Scraper =====
 def scrape_twitter():
     print("✅ Starting Playwright for Twitter scraping...")
     results = []
@@ -79,32 +74,77 @@ def scrape_reddit():
             for submission in reddit.subreddit(sub).new(limit=10):
                 text = submission.title + " " + (submission.selftext or "")
                 for ticker in TICKERS:
-                    if ticker.lower() in text.lower() or f"${ticker.lower()}" in text.lower():
+                    if ticker in text.upper():
                         if any(k in text.lower() for k in KEYWORDS) or ticker in text.upper():
-                            print(f"✅ Found Reddit post: {ticker} | {text[:50]}...")
+                            print(f"✅ Found Reddit post in r/{sub} for ${ticker}")
                             results.append(("Reddit", ticker, text.strip()))
     except Exception as e:
-        print(f"[ERROR] Reddit scraping failed: {e}")
+        print(f"[ERROR] Reddit scrape failed: {e}")
     return results
 
-# ===== Save to CSV =====
-def save_to_csv(results):
-    with open(CSV_FILE, "a", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        for source, ticker, text in results:
-            writer.writerow([datetime.datetime.now(), source, ticker, text])
-
-# ===== Background Scanner =====
-def scanner():
+# ===== Background Scraper Thread =====
+def background_scraper():
     while True:
-        print("\n" + "="*50)
-        print("🔥 SCANNING FOR NEW MENTIONS...")
-        print("="*50 + "\n")
+        print("\n⏳ Running background scrape...")
         twitter_data = scrape_twitter()
         reddit_data = scrape_reddit()
         combined = twitter_data + reddit_data
         if combined:
-            save_to_csv(combined)
+            with open(CSV_FILE, "a", newline="", encoding="utf-8") as f:
+                writer = csv.writer(f)
+                for source, ticker, text in combined:
+                    writer.writerow([datetime.datetime.now(), source, ticker, text])
+        else:
+            print("⚠ No new mentions found.")
+        time.sleep(CHECK_INTERVAL)
+
+threading.Thread(target=background_scraper, daemon=True).start()
+
+# ===== Flask Web App =====
+app = Flask(__name__)
+
+@app.route("/")
+def index():
+    data = []
+    try:
+        with open(CSV_FILE, "r", encoding="utf-8") as f:
+            rows = list(csv.reader(f))[1:]  # skip header
+            data = rows[-20:]  # last 20 entries
+    except Exception as e:
+        data = [["Error", "Reading", "CSV", str(e)]]
+
+    html = """
+    <html>
+    <head>
+        <title>Stock Dashboard</title>
+        <style>
+            body { font-family: Arial; background: #111; color: #fff; }
+            table { width: 100%; border-collapse: collapse; }
+            th, td { padding: 8px; border-bottom: 1px solid #444; }
+            th { background: #222; }
+        </style>
+    </head>
+    <body>
+        <h1>🚀 Stock Mentions Dashboard</h1>
+        <table>
+            <tr><th>Time</th><th>Source</th><th>Ticker</th><th>Text</th></tr>
+            {% for row in data %}
+                <tr>
+                    <td>{{ row[0] }}</td>
+                    <td>{{ row[1] }}</td>
+                    <td>{{ row[2] }}</td>
+                    <td>{{ row[3][:100] }}...</td>
+                </tr>
+            {% endfor %}
+        </table>
+    </body>
+    </html>
+    """
+    return render_template_string(html, data=data)
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=8000)
+
             for source, ticker, text in combined:
                 mentions.append({"time": datetime.datetime.now().strftime("%H:%M:%S"),
                                  "source": source, "ticker": ticker, "text": text})
