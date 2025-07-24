@@ -144,15 +144,6 @@ def index():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000)
-
-            for source, ticker, text in combined:
-                mentions.append({"time": datetime.datetime.now().strftime("%H:%M:%S"),
-                                 "source": source, "ticker": ticker, "text": text})
-                recent_mentions.append((datetime.datetime.now(), ticker))
-        else:
-            print("❌ No new mentions found this cycle.")
-        time.sleep(CHECK_INTERVAL)
-
 # ===== Flask Dashboard =====
 app = Flask(__name__)
 TEMPLATE = """
