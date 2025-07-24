@@ -1,7 +1,6 @@
+
 print("\n🚨 IF YOU SEE THIS, PLAYWRIGHT SCRIPT IS RUNNING 🚨\n")
 import os
-print(f"\n✅ RUNNING SCRIPT FROM: {os.path.abspath(__file__)}\n")
-
 import time
 import threading
 import datetime
@@ -17,13 +16,13 @@ print("=" * 70 + "\n")
 
 # ===== SETTINGS =====
 TICKERS = [
-    "GME", "AMC", "BBBY", "BB", "NOK", "TSLA", "SPCE", "PLTR", "CLF", "KOSS", "F", "AAPL", "SPY", "COIN", "RIOT", "MARA",
-    "DWAC", "BBIG", "CVNA", "TLRY", "SNDL", "APE", "SOFI", "NKLA", "NIO", "XELA", "VFS", "CLOV", "WISH", "HOOD", "AI",
-    "QQQ", "UVXY", "TQQQ", "LCID", "RBLX", "ETH", "BTC"
+    "GME","AMC","BBBY","BB","NOK","TSLA","SPCE","PLTR","CLF","KOSS","F","AAPL","SPY","COIN","RIOT","MARA",
+    "DWAC","BBIG","CVNA","TLRY","SNDL","APE","SOFI","NKLA","NIO","XELA","VFS","CLOV","WISH","HOOD","AI",
+    "QQQ","UVXY","TQQQ","LCID","RBLX","ETH","BTC"
 ]
 KEYWORDS = ["moon", "halt", "runner", "squeeze", "earnings", "guidance", "news", "breakout", "low float"]
-CHECK_INTERVAL = 60
-TRENDING_INTERVAL = 600
+CHECK_INTERVAL = 60  # seconds between scans
+TRENDING_INTERVAL = 600  # last 10 mins for trending
 CSV_FILE = "mentions.csv"
 
 # ===== Reddit API Credentials =====
@@ -33,6 +32,7 @@ reddit = praw.Reddit(
     user_agent="StockPumpScanner"
 )
 
+# Data Structures
 mentions = deque(maxlen=500)
 recent_mentions = deque()
 
@@ -42,7 +42,7 @@ if not os.path.exists(CSV_FILE):
         writer = csv.writer(f)
         writer.writerow(["Time", "Source", "Ticker", "Text"])
 
-# ===== Twitter Scraper (Playwright) =====
+# ===== Twitter Scraper =====
 def scrape_twitter():
     print("✅ Starting Playwright for Twitter scraping...")
     results = []
@@ -50,7 +50,7 @@ def scrape_twitter():
         with sync_playwright() as p:
             browser = p.firefox.launch(headless=True)
             page = browser.new_page()
-            for ticker in TICKERS[:5]:  # Limit for speed
+            for ticker in TICKERS[:5]:  # Limit to 5 for speed
                 print(f"🔍 Scraping Twitter for ${ticker}...")
                 try:
                     url = f"https://twitter.com/search?q=%24{ticker}&src=typed_query&f=live"
@@ -176,11 +176,8 @@ def get_data():
 
     return jsonify({"feed_html": feed_html, "trending_html": trending_html})
 
+# ===== Start App =====
 if __name__ == '__main__':
+    print("🚀 Starting background scanner...")
     threading.Thread(target=scanner, daemon=True).start()
     app.run(host='0.0.0.0', port=8000)
-
-
-if __name__ == '__main__':
-    threading.Thread(target=scanner, daemon=True).start()
-    app.run(host='0.0.0.0', port=8080)
