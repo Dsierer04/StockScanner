@@ -1,6 +1,6 @@
-
 print("\n🚨 IF YOU SEE THIS, PLAYWRIGHT SCRIPT IS RUNNING 🚨\n")
 import os
+print(f"\n✅ RUNNING SCRIPT FROM: {os.path.abspath(__file__)}\n")
 import time
 import threading
 import datetime
@@ -10,9 +10,9 @@ from flask import Flask, render_template_string, jsonify
 from playwright.sync_api import sync_playwright
 import praw
 
-print("\n" + "=" * 70)
+print("\n" + "="*70)
 print("✅ RUNNING PLAYWRIGHT STOCK DASHBOARD")
-print("=" * 70 + "\n")
+print("="*70 + "\n")
 
 # ===== SETTINGS =====
 TICKERS = [
@@ -21,8 +21,8 @@ TICKERS = [
     "QQQ","UVXY","TQQQ","LCID","RBLX","ETH","BTC"
 ]
 KEYWORDS = ["moon", "halt", "runner", "squeeze", "earnings", "guidance", "news", "breakout", "low float"]
-CHECK_INTERVAL = 60  # seconds between scans
-TRENDING_INTERVAL = 600  # last 10 mins for trending
+CHECK_INTERVAL = 60  # Wait time between cycles
+TRENDING_INTERVAL = 600
 CSV_FILE = "mentions.csv"
 
 # ===== Reddit API Credentials =====
@@ -32,7 +32,6 @@ reddit = praw.Reddit(
     user_agent="StockPumpScanner"
 )
 
-# Data Structures
 mentions = deque(maxlen=500)
 recent_mentions = deque()
 
@@ -42,7 +41,7 @@ if not os.path.exists(CSV_FILE):
         writer = csv.writer(f)
         writer.writerow(["Time", "Source", "Ticker", "Text"])
 
-# ===== Twitter Scraper =====
+# ===== Twitter Scraper (Playwright) =====
 def scrape_twitter():
     print("✅ Starting Playwright for Twitter scraping...")
     results = []
@@ -50,7 +49,7 @@ def scrape_twitter():
         with sync_playwright() as p:
             browser = p.firefox.launch(headless=True)
             page = browser.new_page()
-            for ticker in TICKERS[:5]:  # Limit to 5 for speed
+            for ticker in TICKERS[:5]:  # Limit for speed
                 print(f"🔍 Scraping Twitter for ${ticker}...")
                 try:
                     url = f"https://twitter.com/search?q=%24{ticker}&src=typed_query&f=live"
@@ -97,10 +96,11 @@ def save_to_csv(results):
 
 # ===== Background Scanner =====
 def scanner():
+    print("\n🔥 SCANNER THREAD STARTED IMMEDIATELY 🔥\n")
     while True:
-        print("\n" + "=" * 50)
+        print("\n" + "="*50)
         print("🔥 SCANNING FOR NEW MENTIONS...")
-        print("=" * 50 + "\n")
+        print("="*50 + "\n")
         twitter_data = scrape_twitter()
         reddit_data = scrape_reddit()
         combined = twitter_data + reddit_data
@@ -110,6 +110,7 @@ def scanner():
                 mentions.append({"time": datetime.datetime.now().strftime("%H:%M:%S"),
                                  "source": source, "ticker": ticker, "text": text})
                 recent_mentions.append((datetime.datetime.now(), ticker))
+            print(f"✅ Added {len(combined)} mentions to feed.")
         else:
             print("❌ No new mentions found this cycle.")
         time.sleep(CHECK_INTERVAL)
@@ -176,8 +177,6 @@ def get_data():
 
     return jsonify({"feed_html": feed_html, "trending_html": trending_html})
 
-# ===== Start App =====
 if __name__ == '__main__':
-    print("🚀 Starting background scanner...")
     threading.Thread(target=scanner, daemon=True).start()
     app.run(host='0.0.0.0', port=8000)
