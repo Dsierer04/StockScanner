@@ -21,7 +21,7 @@ TICKERS = [
     "QQQ","UVXY","TQQQ","LCID","RBLX","ETH","BTC"
 ]
 KEYWORDS = ["moon", "halt", "runner", "squeeze", "earnings", "guidance", "news", "breakout", "low float"]
-CHECK_INTERVAL = 60
+CHECK_INTERVAL = 20  # Lowered from 60 to keep logs active and avoid Render idle shutdown
 TRENDING_INTERVAL = 600
 CSV_FILE = "mentions.csv"
 
@@ -147,8 +147,13 @@ def get_data():
 
     return jsonify({"feed_html": feed_html, "trending_html": trending_html})
 
-if __name__ == '__main__':
-    threading.Thread(target=scanner, daemon=True).start()
-    app.run(host='0.0.0.0', port=8000)
+# ===== Health Check for Render =====
+@app.route('/health')
+def health():
+    return "OK", 200
+
+# ===== Always Start Scanner Thread =====
+threading.Thread(target=scanner, daemon=True).start()
+
 
 
