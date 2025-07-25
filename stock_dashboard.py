@@ -10,8 +10,8 @@ import threading
 CSV_FILE = "reddit_mentions.csv"
 
 # Reddit API Credentials (replace with your own)
-REDDIT_CLIENT_ID = "YOUR_CLIENT_ID"
-REDDIT_CLIENT_SECRET = "YOUR_CLIENT_SECRET"
+REDDIT_CLIENT_ID = "rKf6A5e6aP4gB3JcbJoP1Q"
+REDDIT_CLIENT_SECRET = "jQFcCe3DlD62ESnYgudK6IAsat_RPw"
 REDDIT_USER_AGENT = "StockDashboard/1.0 by YOUR_USERNAME"
 
 # Subreddits to scan
