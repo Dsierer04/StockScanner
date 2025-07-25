@@ -1,7 +1,5 @@
 print("\n🚨 IF YOU SEE THIS, REDDIT-ONLY SCRIPT IS RUNNING 🚨\n")
 import os
-print(f"\n✅ RUNNING SCRIPT FROM: {os.path.abspath(__file__)}\n")
-
 import time
 import threading
 import datetime
@@ -21,7 +19,7 @@ TICKERS = [
     "QQQ","UVXY","TQQQ","LCID","RBLX","ETH","BTC"
 ]
 KEYWORDS = ["moon", "halt", "runner", "squeeze", "earnings", "guidance", "news", "breakout", "low float"]
-CHECK_INTERVAL = 20  # Lowered from 60 to keep logs active and avoid Render idle shutdown
+CHECK_INTERVAL = 60  # seconds
 TRENDING_INTERVAL = 600
 CSV_FILE = "mentions.csv"
 
@@ -59,12 +57,13 @@ def scrape_reddit():
         print(f"[ERROR] Reddit scraping failed: {e}")
     return results
 
-# ===== Save to CSV =====
+# ===== Save to CSV with quoting fix =====
 def save_to_csv(results):
     with open(CSV_FILE, "a", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
+        writer = csv.writer(f, quoting=csv.QUOTE_ALL)
         for source, ticker, text in results:
-            writer.writerow([datetime.datetime.now(), source, ticker, text])
+            safe_text = text.replace("\n", " ").replace("\r", " ")
+            writer.writerow([datetime.datetime.now(), source, ticker, safe_text])
 
 # ===== Background Scanner =====
 def scanner():
@@ -147,12 +146,10 @@ def get_data():
 
     return jsonify({"feed_html": feed_html, "trending_html": trending_html})
 
-# ===== Health Check for Render =====
-@app.route('/health')
-def health():
-    return "OK", 200
+if __name__ == '__main__':
+    threading.Thread(target=scanner, daemon=True).start()
+    app.run(host='0.0.0.0', port=8000)
 
-# ===== Always Start Scanner Thread =====
 threading.Thread(target=scanner, daemon=True).start()
 
 
