@@ -7,8 +7,8 @@ import time
 
 # ✅ Initialize Reddit API with Environment Variables
 reddit = praw.Reddit(
-    client_id=os.getenv("REDDIT_CLIENT_ID"),
-    client_secret=os.getenv("REDDIT_CLIENT_SECRET"),
+    client_id=os.getenv("rKf6A5e6aP4gB3JcbJoP1Q"),
+    client_secret=os.getenv("jQFcCe3DlD62ESnYgudK6IAsat_RPw"),
     user_agent="StockDashboard/1.0"
 )
 
