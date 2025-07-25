@@ -5,23 +5,17 @@ import os
 import threading
 import time
 
-# ✅ Initialize Reddit API with Environment Variables
+# ✅ Hardcoded Reddit API Credentials
 reddit = praw.Reddit(
-    client_id=os.getenv("CLIENT_ID"),
-    client_secret=os.getenv("CLIENT_SECRET"),
-    user_agent=os.getenv("USER_AGENT")
+    client_id="rKf6A5e6aP4gB3JcbJoP1Q",
+    client_secret="jQfCe3DLD62ESnYgudK6IAsat_RPw",
+    user_agent="StockPumpScanner"
 )
-
-# ✅ Check if credentials exist
-if not reddit.read_only:
-    print("✅ Reddit API Authenticated Successfully!")
-else:
-    print("❌ Reddit API Failed to Authenticate. Check environment variables.")
 
 # ✅ CSV File Setup
 CSV_FILE = "reddit_stock_mentions.csv"
 
-# ✅ Function to Save Data to CSV
+# ✅ Save data to CSV
 def save_to_csv(data):
     file_exists = os.path.isfile(CSV_FILE)
     with open(CSV_FILE, mode="a", newline="", encoding="utf-8") as file:
@@ -32,14 +26,35 @@ def save_to_csv(data):
             safe_text = text.replace("\n", " ").replace("\r", " ")
             writer.writerow([datetime.datetime.now(), source, ticker, safe_text])
 
-# ✅ Example Data (replace with actual scanner logic)
-sample_data = [
-    ("Reddit", "AAPL", "Apple stock is looking bullish today!"),
-    ("Reddit", "TSLA", "Tesla might pump soon!")
-]
+# ✅ Fetch Reddit posts
+def fetch_reddit_posts():
+    subreddit = reddit.subreddit("wallstreetbets+stocks+investing")
+    posts = []
+    for post in subreddit.hot(limit=10):
+        text = f"{post.title} {post.selftext}"
+        tickers = [word for word in text.split() if word.isupper() and len(word) <= 5]
+        for ticker in tickers:
+            posts.append(("Reddit", ticker, text))
+    return posts
 
-save_to_csv(sample_data)
-print("✅ Data saved to CSV successfully!")
+# ✅ Scanner Thread
+def scanner():
+    print("🔥 SCANNER STARTED 🔥")
+    while True:
+        print("✅ Scraping Reddit...")
+        reddit_data = fetch_reddit_posts()
+        if reddit_data:
+            save_to_csv(reddit_data)
+            print(f"✅ Saved {len(reddit_data)} mentions")
+        time.sleep(60)  # Run every 1 min
+
+# ✅ Start Thread
+if __name__ == "__main__":
+    print("\n🚀 IF YOU SEE THIS, REDDIT-ONLY SCRIPT IS RUNNING 🚀\n")
+    print("✅ RUNNING REDDIT STOCK DASHBOARD")
+    t = threading.Thread(target=scanner)
+    t.start()
+
 
 
 
