@@ -1,0 +1,8 @@
+services:
+  - type: web
+    name: stockscanner
+    env: python
+    plan: starter
+    autoDeploy: true
+    buildCommand: ""
+    startCommand: gunicorn -b 0.0.0.0:8000 stock_dashboard:app
