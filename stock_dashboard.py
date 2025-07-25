@@ -10,9 +10,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Get Reddit credentials from environment variables
-client_id = os.getenv("rKf6A5e6aP4gB3JcbJoP1Q")
-client_secret = os.getenv("jQFcCe3DlD62ESnYgudK6IAsat_RPw")
-user_agent = os.getenv("StockPumpScannerMyPussyHurts")
+reddit = praw.Reddit(
+    client_id=os.getenv("rKf6A5e6aP4gB3JcbJoP1Q"),
+    client_secret=os.getenv("jQFcCe3DlD62ESnYgudK6IAsat_RPw"),
+    user_agent=os.getenv("MyFuckingPussyHurts")
+)
 
 # Validate credentials
 if not client_id or not client_secret or not user_agent:
