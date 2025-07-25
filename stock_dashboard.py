@@ -1,105 +1,63 @@
 import praw
 import csv
 import datetime
-import time
+import os
 import threading
+import time
 
-# ===========================
-# CONFIGURATION
-# ===========================
-CSV_FILE = "reddit_mentions.csv"
-
-# Reddit API Credentials (replace with your own)
-REDDIT_CLIENT_ID = "rKf6A5e6aP4gB3JcbJoP1Q"
-REDDIT_CLIENT_SECRET = "jQFcCe3DlD62ESnYgudK6IAsat_RPw"
-REDDIT_USER_AGENT = "StockDashboard/1.0 by YOUR_USERNAME"
-
-# Subreddits to scan
-SUBREDDITS = ["wallstreetbets", "stocks", "options", "investing"]
-
-# Keywords to search for
-TICKERS = ["AAPL", "TSLA", "AMZN", "NVDA", "SPY", "QQQ", "META", "GME", "AMC", "BB", "OPEN", "AI", "ETH", "BTC", "APE", "HOOD"]
-
-# Scan interval (seconds)
-SCAN_INTERVAL = 60  # 1 minute
-
-# ===========================
-# REDDIT INITIALIZATION
-# ===========================
+# ✅ Initialize Reddit API with Environment Variables
 reddit = praw.Reddit(
-    client_id=rKf6A5e6aP4gB3JcbJoP1Q,
-    client_secret=jQFcCe3DlD62ESnYgudK6IAsat_RPw,
-    user_agent=REDDIT_USER_AGENT
+    client_id=os.getenv("REDDIT_CLIENT_ID"),
+    client_secret=os.getenv("REDDIT_CLIENT_SECRET"),
+    user_agent="StockDashboard/1.0"
 )
 
-# ===========================
-# CREATE CSV HEADER IF NOT EXISTS
-# ===========================
-def init_csv():
-    try:
-        with open(CSV_FILE, "x", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
-            writer.writerow(["Timestamp", "Source", "Ticker", "Text"])
-    except FileExistsError:
-        pass  # File already exists
+# ✅ CSV File Setup
+CSV_FILE = "reddit_stock_mentions.csv"
 
-
-# ===========================
-# SAVE RESULTS TO CSV
-# ===========================
-def save_to_csv(results):
-    with open(CSV_FILE, "a", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f, quoting=csv.QUOTE_ALL, escapechar='\\')
-        for source, ticker, text in results:
+# ✅ Function to Save Data to CSV
+def save_to_csv(data):
+    file_exists = os.path.isfile(CSV_FILE)
+    with open(CSV_FILE, mode="a", newline="", encoding="utf-8") as file:
+        writer = csv.writer(file, quoting=csv.QUOTE_MINIMAL, escapechar='\\')
+        if not file_exists:
+            writer.writerow(["timestamp", "source", "ticker", "post_text"])
+        for source, ticker, text in data:
             safe_text = text.replace("\n", " ").replace("\r", " ")
             writer.writerow([datetime.datetime.now(), source, ticker, safe_text])
 
-
-# ===========================
-# SCAN REDDIT FOR TICKERS
-# ===========================
+# ✅ Reddit Scanner Function
 def scan_reddit():
-    print("✅ Scraping Reddit...")
-    found = []
-    for sub in SUBREDDITS:
-        subreddit = reddit.subreddit(sub)
-        for post in subreddit.new(limit=30):  # Adjust as needed
-            text = (post.title + " " + (post.selftext or "")).upper()
-            for ticker in TICKERS:
-                if f"${ticker}" in text or f" {ticker} " in text:
-                    print(f"✅ Found Reddit post: {ticker} | {post.title[:80]}...")
-                    found.append(("Reddit", ticker, post.title))
-    return found
-
-
-# ===========================
-# MAIN SCANNER LOOP
-# ===========================
-def scanner():
-    print("\n🚨 IF YOU SEE THIS, REDDIT-ONLY SCRIPT IS RUNNING 🚨\n")
-    print("======================================================================")
-    print("✅ RUNNING REDDIT STOCK DASHBOARD")
-    print("======================================================================\n")
-    print("🔥 SCANNER THREAD STARTED (REDDIT ONLY) 🔥\n")
-    print("==================================================")
-    print("🔥 SCANNING REDDIT FOR NEW MENTIONS...")
-    print("==================================================\n")
-
+    print("\n🔥 SCANNER THREAD STARTED (REDDIT ONLY) 🔥\n")
     while True:
-        reddit_data = scan_reddit()
+        print("✅ Scraping Reddit...")
+        reddit_data = []
+        for submission in reddit.subreddit("wallstreetbets+stocks").new(limit=20):
+            tickers = [word for word in submission.title.split() if word.isupper() and len(word) <= 5]
+            for ticker in tickers:
+                reddit_data.append(("Reddit", ticker, submission.title))
+                print(f"✅ Found Reddit post: {ticker} | {submission.title}")
         if reddit_data:
             save_to_csv(reddit_data)
-        time.sleep(SCAN_INTERVAL)
+        print("✅ Sleeping for 60 seconds before next scan...\n")
+        time.sleep(60)
 
+# ✅ Start Reddit Scanner in a Thread
+def start_scanner():
+    t = threading.Thread(target=scan_reddit, daemon=True)
+    t.start()
 
-# ===========================
-# STARTUP
-# ===========================
 if __name__ == "__main__":
-    init_csv()
-    print(f"✅ RUNNING SCRIPT FROM: {__file__}\n")
-    thread = threading.Thread(target=scanner)
-    thread.start()
+    print("\n🚨 IF YOU SEE THIS, REDDIT-ONLY SCRIPT IS RUNNING 🚨\n")
+    print("=======================================================================")
+    print("✅ RUNNING REDDIT STOCK DASHBOARD")
+    print("=======================================================================\n")
+    start_scanner()
+
+    # Keep main thread alive
+    while True:
+        time.sleep(1000)
+
 
 
 
