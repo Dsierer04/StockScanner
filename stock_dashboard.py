@@ -1,6 +1,7 @@
 print("\n🚨 IF YOU SEE THIS, PLAYWRIGHT SCRIPT IS RUNNING 🚨\n")
 import os
 print(f"\n✅ RUNNING SCRIPT FROM: {os.path.abspath(__file__)}\n")
+
 import time
 import threading
 import datetime
@@ -21,7 +22,7 @@ TICKERS = [
     "QQQ","UVXY","TQQQ","LCID","RBLX","ETH","BTC"
 ]
 KEYWORDS = ["moon", "halt", "runner", "squeeze", "earnings", "guidance", "news", "breakout", "low float"]
-CHECK_INTERVAL = 60  # Wait time between cycles
+CHECK_INTERVAL = 60  # seconds between scans
 TRENDING_INTERVAL = 600
 CSV_FILE = "mentions.csv"
 
@@ -41,7 +42,7 @@ if not os.path.exists(CSV_FILE):
         writer = csv.writer(f)
         writer.writerow(["Time", "Source", "Ticker", "Text"])
 
-# ===== Twitter Scraper (Playwright) =====
+# ===== Twitter Scraper =====
 def scrape_twitter():
     print("✅ Starting Playwright for Twitter scraping...")
     results = []
@@ -49,9 +50,9 @@ def scrape_twitter():
         with sync_playwright() as p:
             browser = p.firefox.launch(headless=True)
             page = browser.new_page()
-            for ticker in TICKERS[:5]:  # Limit for speed
-                print(f"🔍 Scraping Twitter for ${ticker}...")
+            for ticker in TICKERS[:5]:  # limit to 5 for speed
                 try:
+                    print(f"🔍 Scraping Twitter for ${ticker}...")
                     url = f"https://twitter.com/search?q=%24{ticker}&src=typed_query&f=live"
                     page.goto(url, timeout=45000)
                     page.wait_for_selector("article", timeout=15000)
@@ -62,7 +63,7 @@ def scrape_twitter():
                             print(f"✅ Found tweet for ${ticker}: {text[:50]}...")
                             results.append(("Twitter", ticker, text.strip()))
                 except Exception as e:
-                    print(f"[ERROR] Could not scrape ${ticker}: {e}")
+                    print(f"[ERROR] Twitter scrape failed for ${ticker}: {e}")
             browser.close()
     except Exception as e:
         print(f"[FATAL] Playwright failed: {e}")
@@ -94,25 +95,34 @@ def save_to_csv(results):
         for source, ticker, text in results:
             writer.writerow([datetime.datetime.now(), source, ticker, text])
 
-# ===== Background Scanner =====
+# ===== Scanner =====
 def scanner():
     print("\n🔥 SCANNER THREAD STARTED IMMEDIATELY 🔥\n")
     while True:
-        print("\n" + "="*50)
-        print("🔥 SCANNING FOR NEW MENTIONS...")
-        print("="*50 + "\n")
-        twitter_data = scrape_twitter()
-        reddit_data = scrape_reddit()
-        combined = twitter_data + reddit_data
-        if combined:
-            save_to_csv(combined)
-            for source, ticker, text in combined:
-                mentions.append({"time": datetime.datetime.now().strftime("%H:%M:%S"),
-                                 "source": source, "ticker": ticker, "text": text})
-                recent_mentions.append((datetime.datetime.now(), ticker))
-            print(f"✅ Added {len(combined)} mentions to feed.")
-        else:
-            print("❌ No new mentions found this cycle.")
+        try:
+            print("\n" + "="*50)
+            print("🔥 SCANNING FOR NEW MENTIONS...")
+            print("="*50 + "\n")
+
+            twitter_data = scrape_twitter()
+            reddit_data = scrape_reddit()
+            combined = twitter_data + reddit_data
+
+            if combined:
+                save_to_csv(combined)
+                for source, ticker, text in combined:
+                    mentions.append({
+                        "time": datetime.datetime.now().strftime("%H:%M:%S"),
+                        "source": source,
+                        "ticker": ticker,
+                        "text": text
+                    })
+                    recent_mentions.append((datetime.datetime.now(), ticker))
+                print(f"✅ Added {len(combined)} mentions to feed.")
+            else:
+                print("❌ No new mentions found this cycle.")
+        except Exception as e:
+            print(f"[CRASH] Scanner loop error: {e}")
         time.sleep(CHECK_INTERVAL)
 
 # ===== Flask Dashboard =====
@@ -177,6 +187,9 @@ def get_data():
 
     return jsonify({"feed_html": feed_html, "trending_html": trending_html})
 
+# ===== Always Start Scanner and Run Flask =====
 if __name__ == '__main__':
     threading.Thread(target=scanner, daemon=True).start()
-    app.run(host='0.0.0.0', port=8000)
+    port = int(os.environ.get('PORT', 8000))  # ✅ Dynamic port for Render
+    app.run(host='0.0.0.0', port=port)
+
