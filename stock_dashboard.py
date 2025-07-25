@@ -1,4 +1,4 @@
-print("\n🚨 IF YOU SEE THIS, PLAYWRIGHT SCRIPT IS RUNNING 🚨\n")
+print("\n🚨 IF YOU SEE THIS, REDDIT-ONLY SCRIPT IS RUNNING 🚨\n")
 import os
 print(f"\n✅ RUNNING SCRIPT FROM: {os.path.abspath(__file__)}\n")
 
@@ -8,12 +8,11 @@ import datetime
 import csv
 from collections import deque, Counter
 from flask import Flask, render_template_string, jsonify
-from playwright.sync_api import sync_playwright
 import praw
 
-print("\n" + "="*70)
-print("✅ RUNNING PLAYWRIGHT STOCK DASHBOARD")
-print("="*70 + "\n")
+print("\n" + "=" * 70)
+print("✅ RUNNING REDDIT STOCK DASHBOARD")
+print("=" * 70 + "\n")
 
 # ===== SETTINGS =====
 TICKERS = [
@@ -22,7 +21,7 @@ TICKERS = [
     "QQQ","UVXY","TQQQ","LCID","RBLX","ETH","BTC"
 ]
 KEYWORDS = ["moon", "halt", "runner", "squeeze", "earnings", "guidance", "news", "breakout", "low float"]
-CHECK_INTERVAL = 60  # seconds between scans
+CHECK_INTERVAL = 60
 TRENDING_INTERVAL = 600
 CSV_FILE = "mentions.csv"
 
@@ -42,34 +41,6 @@ if not os.path.exists(CSV_FILE):
         writer = csv.writer(f)
         writer.writerow(["Time", "Source", "Ticker", "Text"])
 
-# ===== Twitter Scraper =====
-def scrape_twitter():
-    print("✅ Starting Playwright for Twitter scraping...")
-    results = []
-    try:
-        with sync_playwright() as p:
-            browser = p.firefox.launch(headless=True)
-            page = browser.new_page()
-            for ticker in TICKERS[:5]:  # limit to 5 for speed
-                try:
-                    print(f"🔍 Scraping Twitter for ${ticker}...")
-                    url = f"https://twitter.com/search?q=%24{ticker}&src=typed_query&f=live"
-                    page.goto(url, timeout=45000)
-                    page.wait_for_selector("article", timeout=15000)
-                    tweets = page.query_selector_all("article div[lang]")
-                    for tweet in tweets[:3]:
-                        text = tweet.inner_text()
-                        if any(k in text.lower() for k in KEYWORDS) or ticker in text.upper():
-                            print(f"✅ Found tweet for ${ticker}: {text[:50]}...")
-                            results.append(("Twitter", ticker, text.strip()))
-                except Exception as e:
-                    print(f"[ERROR] Twitter scrape failed for ${ticker}: {e}")
-            browser.close()
-    except Exception as e:
-        print(f"[FATAL] Playwright failed: {e}")
-    print("✅ Finished Twitter scraping.")
-    return results
-
 # ===== Reddit Scraper =====
 def scrape_reddit():
     print("✅ Scraping Reddit...")
@@ -77,12 +48,12 @@ def scrape_reddit():
     try:
         subreddits = ["wallstreetbets", "pennystocks", "daytrading", "stocks"]
         for sub in subreddits:
-            for submission in reddit.subreddit(sub).new(limit=10):
+            for submission in reddit.subreddit(sub).new(limit=20):
                 text = submission.title + " " + (submission.selftext or "")
                 for ticker in TICKERS:
                     if ticker.lower() in text.lower() or f"${ticker.lower()}" in text.lower():
                         if any(k in text.lower() for k in KEYWORDS) or ticker in text.upper():
-                            print(f"✅ Found Reddit post: {ticker} | {text[:50]}...")
+                            print(f"✅ Found Reddit post: {ticker} | {text[:80]}...")
                             results.append(("Reddit", ticker, text.strip()))
     except Exception as e:
         print(f"[ERROR] Reddit scraping failed: {e}")
@@ -95,34 +66,23 @@ def save_to_csv(results):
         for source, ticker, text in results:
             writer.writerow([datetime.datetime.now(), source, ticker, text])
 
-# ===== Scanner =====
+# ===== Background Scanner =====
 def scanner():
-    print("\n🔥 SCANNER THREAD STARTED IMMEDIATELY 🔥\n")
+    print("\n🔥 SCANNER THREAD STARTED (REDDIT ONLY) 🔥\n")
     while True:
-        try:
-            print("\n" + "="*50)
-            print("🔥 SCANNING FOR NEW MENTIONS...")
-            print("="*50 + "\n")
-
-            twitter_data = scrape_twitter()
-            reddit_data = scrape_reddit()
-            combined = twitter_data + reddit_data
-
-            if combined:
-                save_to_csv(combined)
-                for source, ticker, text in combined:
-                    mentions.append({
-                        "time": datetime.datetime.now().strftime("%H:%M:%S"),
-                        "source": source,
-                        "ticker": ticker,
-                        "text": text
-                    })
-                    recent_mentions.append((datetime.datetime.now(), ticker))
-                print(f"✅ Added {len(combined)} mentions to feed.")
-            else:
-                print("❌ No new mentions found this cycle.")
-        except Exception as e:
-            print(f"[CRASH] Scanner loop error: {e}")
+        print("\n" + "=" * 50)
+        print("🔥 SCANNING REDDIT FOR NEW MENTIONS...")
+        print("=" * 50 + "\n")
+        reddit_data = scrape_reddit()
+        if reddit_data:
+            save_to_csv(reddit_data)
+            for source, ticker, text in reddit_data:
+                mentions.append({"time": datetime.datetime.now().strftime("%H:%M:%S"),
+                                 "source": source, "ticker": ticker, "text": text})
+                recent_mentions.append((datetime.datetime.now(), ticker))
+            print(f"✅ Added {len(reddit_data)} mentions to feed.")
+        else:
+            print("❌ No new Reddit mentions found this cycle.")
         time.sleep(CHECK_INTERVAL)
 
 # ===== Flask Dashboard =====
@@ -131,7 +91,7 @@ TEMPLATE = """
 <!DOCTYPE html>
 <html>
 <head>
-<title>Stock Pump Scanner</title>
+<title>Reddit Stock Scanner</title>
 <style>
 body { background-color: #0f0f0f; color: #fff; font-family: Arial; margin: 0; }
 h1 { color: #00ff91; text-align: center; }
@@ -153,7 +113,7 @@ setInterval(refreshData, 10000);
 </script>
 </head>
 <body>
-<h1>🔥 Stock Pump Scanner Dashboard</h1>
+<h1>🔥 Reddit Stock Scanner Dashboard</h1>
 <div class="container">
 <div class="section"><h2>Live Mentions</h2><div id="feed"></div></div>
 <div class="section"><h2>Trending</h2><div id="trending"></div></div>
@@ -187,9 +147,8 @@ def get_data():
 
     return jsonify({"feed_html": feed_html, "trending_html": trending_html})
 
-# ===== Always Start Scanner and Run Flask =====
 if __name__ == '__main__':
     threading.Thread(target=scanner, daemon=True).start()
-    port = int(os.environ.get('PORT', 8000))  # ✅ Dynamic port for Render
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=8000)
+
 
